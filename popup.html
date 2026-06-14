@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>记事本</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <span class="sidebar-title" id="sidebarTitle">章节</span>
+      <button id="addChapterBtn" class="btn-icon-sm" title="添加章节">＋</button>
+    </div>
+    <div id="chapterList" class="chapter-list"></div>
+  </div>
+  <div class="main">
+    <div class="toolbar">
+      <span class="title" id="chapterTitle">记事本</span>
+      <div class="toolbar-actions">
+        <button id="saveBtn" class="btn btn-primary" title="保存 (Ctrl+S)">保存</button>
+        <button id="clearBtn" class="btn btn-danger" title="清空当前页">清空</button>
+        <button id="settingsBtn" class="btn btn-icon" title="设置">&#9881;</button>
+      </div>
+    </div>
+    <div class="stats">
+      <span id="charCount">0 字符</span>
+      <span id="wordCount">0 词</span>
+      <span id="lineCount">0 行</span>
+    </div>
+    <div id="settingsPanel" class="settings-panel collapsed">
+      <label class="toggle-row">
+        <span id="autoSaveLabel">自动保存</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="autoSaveToggle" checked>
+          <span class="toggle-slider"></span>
+        </label>
+      </label>
+      <div class="lang-row">
+        <span id="languageLabel">语言</span>
+        <div class="lang-btns">
+          <button id="langZhBtn" class="btn-lang active">中文</button>
+          <button id="langEnBtn" class="btn-lang">English</button>
+        </div>
+      </div>
+    </div>
+    <textarea id="editor" placeholder="在这里输入文本..." spellcheck="false"></textarea>
+    <div class="page-nav">
+      <button id="prevPageBtn" class="btn btn-page" title="上一页">◀</button>
+      <span id="pageIndicator" class="page-indicator">第 1/1 页</span>
+      <button id="nextPageBtn" class="btn btn-page" title="下一页">▶</button>
+      <button id="addPageBtn" class="btn btn-page-add" title="添加新页">＋</button>
+    </div>
+    <div class="footer">
+      <span id="saveStatus">已就绪</span>
+      <span id="shortcutHint" class="shortcut-hint">Ctrl+S 保存</span>
+    </div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html>
