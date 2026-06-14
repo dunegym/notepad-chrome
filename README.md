@@ -26,6 +26,12 @@ A minimalist Chrome notepad extension with multi-chapter, multi-page, auto-save,
   - 可手动保存（Ctrl+S / Cmd+S）
   - Manual save available with Ctrl+S / Cmd+S
 
+- **撤回与恢复 / Undo & Redo**
+  - 支持 Ctrl+Z / Cmd+Z 撤回、Ctrl+Y / Ctrl+Shift+Z / Cmd+Shift+Z 恢复
+  - Supports Ctrl+Z / Cmd+Z undo and Ctrl+Y / Ctrl+Shift+Z / Cmd+Shift+Z redo
+  - 每页独立维护最近 100 条编辑记录
+  - Each page keeps its own last 100 editing records
+
 - **统计信息 / Statistics**
   - 实时显示字符数、词数、行数
   - Real-time display of character, word, and line counts

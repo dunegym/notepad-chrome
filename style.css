@@ -216,7 +216,7 @@ body {
   line-height: 1;
 }
 
-.btn-icon:hover {
+.btn-icon:hover:not(:disabled) {
   color: #cdd6f4;
   background: #313244;
 }
@@ -224,6 +224,11 @@ body {
 .btn-icon.active {
   color: #cba6f7;
   background: #313244;
+}
+
+.btn-icon:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
 
 .stats {

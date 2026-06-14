@@ -31,6 +31,8 @@ var I18N = {
     clearConfirm: '确定要清空当前页内容吗？',
     deleteChapterTitle: '删除章节',
     deleteChapterConfirm: '确定要删除章节“{name}”吗？该章节下的 {pages} 页内容将被一并删除。',
+    undoTitle: '撤回 (Ctrl+Z)',
+    redoTitle: '恢复 (Ctrl+Y)',
     shortcutHint: 'Ctrl+S 保存'
   },
   en: {
@@ -65,6 +67,8 @@ var I18N = {
     clearConfirm: 'Clear current page content?',
     deleteChapterTitle: 'Delete chapter',
     deleteChapterConfirm: 'Delete chapter "{name}"? Its {pages} pages will also be removed.',
+    undoTitle: 'Undo (Ctrl+Z)',
+    redoTitle: 'Redo (Ctrl+Y)',
     shortcutHint: 'Ctrl+S to save'
   }
 };
@@ -104,6 +108,8 @@ var sidebarTitle = document.getElementById('sidebarTitle');
 var autoSaveLabel = document.getElementById('autoSaveLabel');
 var languageLabel = document.getElementById('languageLabel');
 var shortcutHint = document.getElementById('shortcutHint');
+var undoBtn = document.getElementById('undoBtn');
+var redoBtn = document.getElementById('redoBtn');
 
 var CHAPTERS_KEY = 'notepad_chapters';
 var STATE_KEY = 'notepad_state';
@@ -115,6 +121,9 @@ var pageIndex = 0;
 var autoSave = true;
 var saveTimeout = null;
 var isSwitching = false;
+var pageHistory = {};
+var historyTimeout = null;
+var MAX_HISTORY = 100;
 
 function guid() {
   return 'xxxx-xxxx'.replace(/x/g, function () {
@@ -152,6 +161,83 @@ function saveSettings() {
   chrome.storage.local.set({
     [SETTINGS_KEY]: { autoSave: autoSave, lang: lang }
   });
+}
+
+function getHistoryKey(chIdx, pIdx) {
+  var ch = chapters[chIdx];
+  return ch ? ch.id + '_' + pIdx : null;
+}
+
+function getHistory(chIdx, pIdx) {
+  var key = getHistoryKey(chIdx, pIdx);
+  if (!key) return { stack: [], index: -1 };
+  if (!pageHistory[key]) {
+    pageHistory[key] = { stack: [], index: -1 };
+  }
+  return pageHistory[key];
+}
+
+function updateUndoRedoButtons() {
+  var h = getHistory(chapterIndex, pageIndex);
+  undoBtn.disabled = !h || h.index <= 0;
+  redoBtn.disabled = !h || h.index >= h.stack.length - 1;
+}
+
+function recordHistory(force) {
+  if (isSwitching) return;
+  var h = getHistory(chapterIndex, pageIndex);
+  var content = editor.value;
+  if (h.index >= 0 && h.stack[h.index] === content) return;
+
+  if (h.index < h.stack.length - 1) {
+    h.stack = h.stack.slice(0, h.index + 1);
+  }
+  h.stack.push(content);
+  h.index++;
+
+  if (h.stack.length > MAX_HISTORY) {
+    h.stack.shift();
+    h.index--;
+  }
+  updateUndoRedoButtons();
+}
+
+function initHistory() {
+  var h = getHistory(chapterIndex, pageIndex);
+  if (h.stack.length === 0) {
+    h.stack.push(editor.value);
+    h.index = 0;
+    updateUndoRedoButtons();
+  }
+}
+
+function restoreHistory() {
+  var h = getHistory(chapterIndex, pageIndex);
+  var content = h.stack[h.index];
+  isSwitching = true;
+  editor.value = content;
+  chapters[chapterIndex].pages[pageIndex] = content;
+  updateStats();
+  isSwitching = false;
+  updateUndoRedoButtons();
+  clearTimeout(saveTimeout);
+  saveChapters();
+}
+
+function undo() {
+  var h = getHistory(chapterIndex, pageIndex);
+  if (h.index > 0) {
+    h.index--;
+    restoreHistory();
+  }
+}
+
+function redo() {
+  var h = getHistory(chapterIndex, pageIndex);
+  if (h.index < h.stack.length - 1) {
+    h.index++;
+    restoreHistory();
+  }
 }
 
 function loadData() {
@@ -228,6 +314,8 @@ function applyLanguage() {
   prevPageBtn.title = t('prevPageTitle');
   nextPageBtn.title = t('nextPageTitle');
   addPageBtn.title = t('addPageTitle');
+  undoBtn.title = t('undoTitle');
+  redoBtn.title = t('redoTitle');
   shortcutHint.textContent = t('shortcutHint');
   saveStatus.textContent = t('ready');
   saveStatus.className = '';
@@ -250,6 +338,7 @@ function loadPage() {
     editor.value = '';
   }
   updateStats();
+  initHistory();
   isSwitching = false;
 }
 
@@ -298,6 +387,7 @@ function setStatus(message, isError) {
 }
 
 function save() {
+  recordHistory(true);
   saveCurrentPage();
   setStatus(t('saved'), false);
 }
@@ -357,6 +447,7 @@ function renderChapterList() {
 }
 
 function switchChapter(idx) {
+  recordHistory(true);
   saveCurrentPage();
   chapterIndex = idx;
   pageIndex = 0;
@@ -367,6 +458,7 @@ function switchChapter(idx) {
 }
 
 function switchPage(idx) {
+  recordHistory(true);
   saveCurrentPage();
   pageIndex = idx;
   loadPage();
@@ -375,6 +467,7 @@ function switchPage(idx) {
 }
 
 function addChapter() {
+  recordHistory(true);
   saveCurrentPage();
   var name = t('newChapterName', { n: chapters.length + 1 });
   chapters.push({ id: guid(), name: name, pages: [''] });
@@ -391,6 +484,7 @@ function deleteChapter(idx) {
   var ch = chapters[idx];
   var msg = t('deleteChapterConfirm', { name: ch.name, pages: ch.pages.length });
   if (!confirm(msg)) return;
+  recordHistory(true);
   saveCurrentPage();
   chapters.splice(idx, 1);
   if (idx < chapterIndex) {
@@ -419,6 +513,7 @@ function renameChapter(idx) {
 }
 
 function addPage() {
+  recordHistory(true);
   saveCurrentPage();
   chapters[chapterIndex].pages.push('');
   pageIndex = chapters[chapterIndex].pages.length - 1;
@@ -436,6 +531,19 @@ editor.addEventListener('input', function () {
       setStatus(t('autoSaved'), false);
     }, 800);
   }
+  if (!isSwitching) {
+    clearTimeout(historyTimeout);
+    historyTimeout = setTimeout(function () {
+      recordHistory();
+    }, 600);
+  }
+});
+
+editor.addEventListener('blur', function () {
+  if (!isSwitching) {
+    clearTimeout(historyTimeout);
+    recordHistory(true);
+  }
 });
 
 saveBtn.addEventListener('click', function () {
@@ -445,10 +553,13 @@ saveBtn.addEventListener('click', function () {
 
 clearBtn.addEventListener('click', function () {
   if (editor.value && !confirm(t('clearConfirm'))) return;
+  recordHistory(true);
   editor.value = '';
   updateStats();
   clearTimeout(saveTimeout);
+  clearTimeout(historyTimeout);
   saveCurrentPage();
+  recordHistory(true);
   setStatus(t('cleared'), false);
 });
 
@@ -457,6 +568,12 @@ document.addEventListener('keydown', function (e) {
     e.preventDefault();
     clearTimeout(saveTimeout);
     save();
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+    e.preventDefault();
+    undo();
+  } else if ((e.ctrlKey || e.metaKey) && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) {
+    e.preventDefault();
+    redo();
   }
 });
 
@@ -488,6 +605,14 @@ addPageBtn.addEventListener('click', function () {
 
 addChapterBtn.addEventListener('click', function () {
   addChapter();
+});
+
+undoBtn.addEventListener('click', function () {
+  undo();
+});
+
+redoBtn.addEventListener('click', function () {
+  redo();
 });
 
 loadSettings();
